@@ -8,6 +8,22 @@ TABLE_COL_NAME = 'Table'
 HEADER_SIZE_COL_NAME = 'Header_Size'
 FOOTER_SIZE_COL_NAME = 'Footer_Size'
 
+
+def detect_delimiter(csv_file):
+    with open(csv_file, 'r') as myCsvfile:
+        header = myCsvfile.readline()
+        if header.find(";") != -1:
+            return ";"
+        if header.find(",") != -1:
+            return ","
+    # default delimiter (MS Office export)
+    return ";"
+
+
+    # TODO Paths validation
+    # TODO Exception handling
+
+
 if __name__ == '__main__':
     # Get paths from command line arguments
     argParser = argparse.ArgumentParser()
@@ -17,17 +33,16 @@ if __name__ == '__main__':
 
     args = argParser.parse_args()
 
-    # TODO Paths validation
-    # TODO CSV delimiter
-    # TODO Exception handling
-
     # Convert paths to strings
     source_path = str(args.source)
     result_path = str(args.result)
     config_path = str(args.config)
 
+    # Get CSV delimiter
+    delimiter = detect_delimiter(config_path)
+
     # Read column row to specify types
-    col_names = pandas.read_csv(config_path, nrows=0).columns.values
+    col_names = pandas.read_csv(config_path, nrows=0, sep=delimiter).columns.values
     first_col_name = col_names[0]
     types_dict = {first_col_name: str,
                   PAGE_COL_NAME: int,
@@ -36,7 +51,7 @@ if __name__ == '__main__':
                   FOOTER_SIZE_COL_NAME: int}
 
     # Read config file to get page numbers where tables are located in the document and rows to delete
-    tables_to_parse = pandas.read_csv(config_path, dtype=types_dict)
+    tables_to_parse = pandas.read_csv(config_path, dtype=types_dict, sep=delimiter)
     tables_to_parse.set_index([PAGE_COL_NAME, TABLE_COL_NAME], inplace=True,
                               append=True, drop=False)
 
@@ -97,7 +112,7 @@ if __name__ == '__main__':
             processed_tables_count += 1
             accuracy_results_list.append(table.parsing_report['accuracy'])
 
-    resulting_table.to_csv(result_path, index=False, header=False)
+    resulting_table.to_csv(result_path, index=False, header=False, sep=delimiter)
     if processed_tables_count > 0:
         print('Finished data export, parsed ' + str(processed_tables_count) + ' tables with average accuracy of '
               + str(sum(accuracy_results_list) / len(accuracy_results_list)))

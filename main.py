@@ -3,6 +3,11 @@ import pandas
 import argparse
 from pathlib import Path
 
+PAGE_COL_NAME = 'Page'
+TABLE_COL_NAME = 'Table'
+HEADER_SIZE_COL_NAME = 'Header_Size'
+FOOTER_SIZE_COL_NAME = 'Footer_Size'
+
 if __name__ == '__main__':
     # Get paths from command line arguments
     argParser = argparse.ArgumentParser()
@@ -12,28 +17,30 @@ if __name__ == '__main__':
 
     args = argParser.parse_args()
 
-    print(args.source, type(args.source), args.source.exists())
-    print(args.result, type(args.result), args.result.exists())
-    print(args.config, type(args.config), args.config.exists())
-
     # TODO Paths validation
+    # TODO CSV delimiter
+    # TODO Exception handling
 
     # Convert paths to strings
     source_path = str(args.source)
     result_path = str(args.result)
     config_path = str(args.config)
 
-    # Read config file to get page numbers where tables are located in the document
-    columns = ['Country', 'Page', 'Table']
-    tables_to_parse = pandas.read_csv(config_path, dtype={
-        'Country': str,
-        'Page': int,
-        'Table': int
-    })
-    tables_to_parse.set_index(["Page", "Table"], inplace=True,
+    # Read column row to specify types
+    col_names = pandas.read_csv(config_path, nrows=0).columns.values
+    first_col_name = col_names[0]
+    types_dict = {first_col_name: str,
+                  PAGE_COL_NAME: int,
+                  TABLE_COL_NAME: int,
+                  HEADER_SIZE_COL_NAME: int,
+                  FOOTER_SIZE_COL_NAME: int}
+
+    # Read config file to get page numbers where tables are located in the document and rows to delete
+    tables_to_parse = pandas.read_csv(config_path, dtype=types_dict)
+    tables_to_parse.set_index([PAGE_COL_NAME, TABLE_COL_NAME], inplace=True,
                               append=True, drop=False)
 
-    page_numbers_list = tables_to_parse['Page'].astype(str).values.tolist()
+    page_numbers_list = tables_to_parse[PAGE_COL_NAME].astype(str).values.tolist()
     page_numbers_string = ','.join(page_numbers_list)
 
     # Read the document on specified pages
@@ -43,7 +50,6 @@ if __name__ == '__main__':
 
     # Initializing the table to store parsing results and its properties
     resulting_table = None
-    first_column_name = None
     resulting_table_width = None
     # List to store results of table parsing accuracy
     accuracy_results_list = []
@@ -54,15 +60,15 @@ if __name__ == '__main__':
         page = table.page
         order = table.order
 
-        country_row = tables_to_parse.loc[(tables_to_parse['Page'] == page)
-                                          & (tables_to_parse['Table'] == order)].head()
+        country_row = tables_to_parse.loc[(tables_to_parse[PAGE_COL_NAME] == page)
+                                          & (tables_to_parse[TABLE_COL_NAME] == order)].head()
 
         if not country_row.empty:
             # Create a new table to export data with the same columns as the first table plus country column
             if resulting_table is None:
-                resulting_table = table.df.iloc[:1, :].copy()
-                resulting_table.insert(0, 'Country', 'Country')
-                first_column_name = str(resulting_table.iloc[0, 1]).lower()
+                resulting_table = table.df.iloc[:country_row[HEADER_SIZE_COL_NAME].values[0], :].copy()
+                resulting_table.insert(0, first_col_name, None)
+                resulting_table.at[0, first_col_name] = first_col_name
                 resulting_table_width = len(resulting_table.columns)
 
             # Fetch dataframe
@@ -71,16 +77,18 @@ if __name__ == '__main__':
             # Check that width of table matches the expected width
             table_width = len(df.columns)
             if table_width != resulting_table_width - 1:
-                print('Table #' + str(order) + ' on page #' + str(page) + 'has incorrect width: ' + str(table_width)
+                print('Table #' + str(order) + ' on page # ' + str(page) + ' has incorrect width: ' + str(table_width)
                       + '. Table was not appended to the resulting table')
                 continue
 
-            # Remove header and total rows
-            df.drop(df.loc[df[0].str.lower().str.startswith(first_column_name)].index, inplace=True)
-            df.drop(df.loc[df[0].str.lower().str.startswith('total')].index, inplace=True)
+            # Remove header and footer rows, getting their size from spec
+            header_size = country_row[HEADER_SIZE_COL_NAME].values[0]
+            footer_size = country_row[FOOTER_SIZE_COL_NAME].values[0]
+            df.drop(df.head(header_size).index, inplace=True)
+            df.drop(df.tail(footer_size).index, inplace=True)
 
             # Add country data
-            df.insert(0, 'Country', country_row['Country'].values[0])
+            df.insert(0, first_col_name, country_row[first_col_name].values[0])
 
             # Append data to the resulting table
             resulting_table = pandas.concat([resulting_table, df])

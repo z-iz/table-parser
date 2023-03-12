@@ -19,6 +19,15 @@ def detect_delimiter(csv_file):
     # default delimiter (MS Office export)
     return ";"
 
+
+def drop_blank_columns(dataframe):
+    # Find the columns where each value is a blank string
+    empty_cols = [col for col in dataframe.columns if dataframe[col].eq("").all()]
+    # Drop these columns from the dataframe
+    dataframe.drop(empty_cols,
+            axis=1,
+            inplace=True)
+
     # TODO Paths validation
     # TODO Exception handling
 
@@ -83,36 +92,61 @@ if __name__ == '__main__':
             page = table.page
             order = table.order
 
-            country_row = tables_to_parse.loc[(tables_to_parse[PAGE_COL_NAME] == page)
-                                              & (tables_to_parse[TABLE_COL_NAME] == order)].head()
+            spec_row = tables_to_parse.loc[(tables_to_parse[PAGE_COL_NAME] == page)
+                                           & (tables_to_parse[TABLE_COL_NAME] == order)].head()
 
-            if not country_row.empty:
+            if not spec_row.empty:
+                header_size = spec_row[HEADER_SIZE_COL_NAME].values[0]
+                footer_size = spec_row[FOOTER_SIZE_COL_NAME].values[0]
+
                 # Create a new table to export data with the same columns as the first table plus country column
                 if resulting_table is None:
-                    resulting_table = table.df.iloc[:country_row[HEADER_SIZE_COL_NAME].values[0], :].copy()
+                    resulting_table = table.df.copy()
+
+                    # TODO Extract as a function
+
+                    # Delete footer first to avoid cases when the footer has merged cells resulting in empty columns
+                    resulting_table.drop(resulting_table.tail(footer_size).index, inplace=True)
+
+                    # Delete empty columns, if any
+                    drop_blank_columns(resulting_table)
+
+                    # Delete all rows except header
+                    resulting_table.drop(resulting_table.tail(-1 * header_size).index, inplace=True)
+
+                    # Insert first column specified in spec and rename columns
                     resulting_table.insert(0, first_col_name, None)
-                    resulting_table.at[0, first_col_name] = first_col_name
+                    column_labels = range(0, len(resulting_table.columns))
+                    resulting_table = resulting_table.set_axis(column_labels, axis=1)
+                    resulting_table.at[0, 0] = first_col_name
+
+                    # Calculate header width to validate it before appending next tables
                     resulting_table_width = len(resulting_table.columns)
 
                 # Fetch dataframe
                 df = table.df
 
+                # Delete footer first to avoid cases when the footer has merged cells resulting in empty columns
+                df.drop(df.tail(footer_size).index, inplace=True)
+
+                # Delete empty columns, if any
+                drop_blank_columns(df)
+
+                # Delete header
+                df.drop(df.head(header_size).index, inplace=True)
+
+                # Add first column and rename columns
+                df.insert(0, first_col_name, spec_row[first_col_name].values[0])
+                column_labels = range(0, len(df.columns))
+                df = df.set_axis(column_labels, axis=1)
+
                 # Check that width of table matches the expected width
                 table_width = len(df.columns)
-                if table_width != resulting_table_width - 1:
+                if table_width != resulting_table_width:
                     print(
                         'Table #' + str(order) + ' on page # ' + str(page) + ' has incorrect width: ' + str(table_width)
                         + '. Table was not appended to the resulting table')
                     continue
-
-                # Remove header and footer rows, getting their size from spec
-                header_size = country_row[HEADER_SIZE_COL_NAME].values[0]
-                footer_size = country_row[FOOTER_SIZE_COL_NAME].values[0]
-                df.drop(df.head(header_size).index, inplace=True)
-                df.drop(df.tail(footer_size).index, inplace=True)
-
-                # Add country data
-                df.insert(0, first_col_name, country_row[first_col_name].values[0])
 
                 # Append data to the resulting table
                 resulting_table = pandas.concat([resulting_table, df])

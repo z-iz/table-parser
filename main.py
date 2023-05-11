@@ -144,8 +144,8 @@ if __name__ == '__main__':
                 table_width = len(df.columns)
                 if table_width != resulting_table_width:
                     print(
-                        'Table #' + str(order) + ' on page # ' + str(page) + ' has incorrect width: ' + str(table_width)
-                        + '. Table was not appended to the resulting table')
+                        'Table #' + str(order) + ' on page # ' + str(page) + ' has incorrect number of columns: '
+                        + str(table_width) + '. Table was not appended to the resulting table')
                     continue
 
                 # Append data to the resulting table

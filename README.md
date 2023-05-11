@@ -53,7 +53,7 @@ Config file for each table type is a CSV file having the following columns:
 The parse results in CSV format will be placed in this directory.
 A resulting file is generated for each config file (i.e. table type)
 
-## Result
+### Result
 
 Resulting CSV file for a particular table type will contain 
 the parsed data from the tables of this type from the source PDF file.

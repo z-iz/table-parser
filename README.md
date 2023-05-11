@@ -27,13 +27,15 @@ python3 main.py \
 
 ### Source PDF file
 Source PDF file should be native (i.e. created from electronic document), 
-not a scanned one.  
+not a scanned one.
+
 Also, it should contain multiple tables having the same 
 layout (number of columns and their names).
 
 ### Config directory
 This directory should contain CSV files describing the 
-configuration of parsing.  
+configuration of parsing.
+
 Each of these config files describe a single type of 
 table (set of tables having the same layout) in the source document.
 
@@ -54,8 +56,10 @@ A resulting file is generated for each config file (i.e. table type)
 ## Result
 
 Resulting CSV file for a particular table type will contain 
-the parsed data from the tables of this type from the source PDF file.  
-Tables are appended in the order they were listed in the config file.  
-Before appending, the script checks that the number of columns match between 
-the appended part and the main part.  
+the parsed data from the tables of this type from the source PDF file.
+
+Tables are appended in the order they were listed in the config file.
+
+Before appending, the script checks that the number of columns match between the appended part and the main part.
+
 The first column of the resulting table will be filled with data from the "distinguishing" column of the config file.
